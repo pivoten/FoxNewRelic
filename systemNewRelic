@@ -1,0 +1,309 @@
+* Pivoten, LLC
+* System:Log:NewRelic
+* Summary:  FoxPro - NewRelic - Event log monitoring.
+* Reference: https://docs.newrelic.com/docs/logs/log-api/introduction-log-api/
+
+*
+* Procedures always expects 10 total attributes. Uses tcLogType to determine processing
+*
+PROCEDURE SendLogToNewRelic(tcLog, tcLogType, tcArg1, tcArg2, tcArg3, tcArg4, tcArg5, tcArg6, tcArg7, tcArg8, tcArg9)
+LOCAL llReturn
+
+llReturn = .T.
+
+   TRY
+* Load ChilKat License
+      IF sysChilKatLicense = .F.
+         llreturn = .F.
+         EXIT
+      ENDIF
+
+* Don't go any further if there is no internet access
+      IF InternetAvailable = .F.
+         llreturn = .F.
+         EXIT
+      ENDIF
+
+*
+* Variables
+*
+      LOCAL loHttp
+      LOCAL lcUrl
+      LOCAL lcJsonRequestBody
+      LOCAL loResp
+      LOCAL lcJsonResponseStr
+      LOCAL loJson
+      LOCAL lcDate
+      LOCAL lcTime
+      LOCAL lcProduct
+      LOCAL lcVersion
+      LOCAL lcVersionDate
+      LOCAL lcVersionTime
+      LOCAL lcRegCode
+      LOCAL llReturn
+      
+      llReturn = .T.
+
+*
+* Determine Application Version
+*
+
+      lcVersion = cFileVersion
+      DO CASE
+         CASE App1
+            lcProduct = 'App1'
+            lcVersion = lcVersion
+         CASE App2
+            lcProduct = 'App2'
+            lcVersion = lcVersion
+         CASE App3
+            lcProduct = 'App3'
+            lcVersion = lcVersion
+
+      ENDCASE
+
+*
+* Get Registration Code
+*
+
+*
+* Load Objects
+*
+      loHttp = CREATEOBJECT('Chilkat_9_5_0.Http')
+      loJson = CREATEOBJECT('Chilkat_9_5_0.JsonObject')
+
+
+* Set the required headers for New Relic.
+* FR - Move to Key Management
+      loHttp.SetRequestHeader("Api-Key", "")
+      loHttp.SetRequestHeader("Content-Type", "application/json")
+      loHttp.ACCEPT = "*/*"
+
+* Choose the correct endpoint based on your New Relic account region.
+      lcUrl = "https://log-api.newrelic.com/log/v1"
+
+*
+* Create NewRelic Log JSON
+*
+
+* Json:Attributes:NewRelic
+*
+      loJson.UpdateString("newrelic.source", "api.logs")
+
+* Json:Atributes:Agent
+      loJson.UpdateString("newrelic.source", "api.logs")
+      loJson.UpdateString("agentName", "agentName")
+
+*
+* Json:Attributes:Account
+*
+      loJson.UpdateString("account.client_name", ALLTRIM(cRegCompany))
+      loJson.UpdateString("account.client_id", ALLTRIM(cClient))
+
+*
+* Json:Attributes:Application
+*
+      loJson.UpdateString("application.name", lcProduct)
+      loJson.UpdateString("application.version", cFileVersion)
+      loJson.UpdateString("application.license", lcRegCode)
+*    loJson.UpdateStrong("application.support", Dsupportexpires)
+* Add later
+*   loJson.UpdateString("application.ipaddress", getipaddr())
+
+*
+* Json:Attributes:Company
+*
+      loJson.UpdateString("company.name", cCompanyName)
+      loJson.UpdateString("company.datapath", cDataFilePath)
+      loJson.UpdateString("company.username",cuser)
+* add later - size of files
+* loJson.UpdateString("company.dishist_size","xxxxxxx")
+
+*
+* Initialize JSON and HTTP objects, set headers, etc.
+*
+
+      DO CASE
+         CASE tcLog = "error"
+            DO CASE
+               CASE tcLogType = 'systemLog'
+                  LOCAL errorLogDate, errorLogTime, errorLogProgram, errorLogMethod, errorLogLine, errorLogNumber, errorLogMessage, errorLogDetails
+                  errorLogDate    = tcArg1
+                  errorLogTime    = tcArg2
+                  errorLogProgram = tcArg3
+                  errorLogMethod  = tcArg4
+                  errorLogLine    = tcArg5
+                  errorLogNumber  = tcArg6
+                  errorLogMessage = tcArg7
+                  errorLogDetails = tcArg8
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.error_date", errorLogDate)
+                  loJson.UpdateString("log.error_time", errorLogTime)
+                  loJson.UpdateString("log.error_program", errorLogProgram)
+                  loJson.UpdateString("log.error_method", errorLogMethod)
+                  loJson.UpdateString("log.error_line", errorLogLine)
+                  loJson.UpdateString("log.error_number", errorLogNumber)
+                  loJson.UpdateString("log.error_message", errorLogMessage)
+                  loJson.UpdateString("log.error_details", errorLogDetails)
+
+               CASE tcLogType = 'billing' && SendLogToNewRelic(lcLog, lcLogType, lcMessage, "", "", "", "", "", "", "","")
+                  LOCAL errorLogDate, errorLogTime, errorLogProgram, errorLogMethod, errorLogLine, errorLogNumber, errorLogMessage, errorLogDetails
+                  errorLogMessage = tcArg1
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.error_message", errorLogMessage)
+
+               OTHERWISE
+                  MESSAGEBOX("Unrecognized error log type: " + tcLogType, 48, "Log Type Error")
+                  RETURN .F.
+            ENDCASE
+
+         CASE tcLog = "access"
+            DO CASE
+               CASE tcLogType = 'login' && SendLogToNewRelic(lcLog, lcLogType, lcLogResult, lcMessage, "", "", "", "", "", "", "")
+                  LOCAL accessResult, accessDate, accessTime, accessMessage
+                  accessLogResult    = tcArg1
+                  accessLoginMessage = tcArg2
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.access_message", accessLoginMessage)
+
+               CASE tcLogType = 'logout' && SendLogToNewRelic(lcLog, lcLogType, lcLogResult, lcMessage, "", "", "", "", "", "", "")
+                  LOCAL accessResult, accessDate, accessTime, accessMessage
+                  accessLogResult    = tcArg1
+                  accessLogoutMessage = tcArg2
+                  accessTimeStart     = tcArg3
+                  accessTimeEnd       = tcArg4
+                  accessDuration      = tcArg5
+                  accessIPAddress     = tcArg6
+                  accessVersion       = tcArg7
+                  accessUser          = tcArg8
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.access_message", accessLogoutMessage)
+                  loJson.UpdateString("log.access_start", accessTimeStart)
+                  loJson.UpdateString("log.access_end", accessTimeEnd)
+                  loJson.UpdateString("log.access_duration", accessDuration)
+                  loJson.UpdateString("log.access_ipaddress", accessIPAddress)
+                  loJson.UpdateString("log.access_version", accessVersion)
+                  loJson.UpdateString("log.access_user", accessUser)
+
+               CASE tcLogType = 'usage' && SendLogToNewRelic(lcLog, lcLogType, lcLogResult, lcMessage, "", "", "", "", "", "", "")
+                  LOCAL accessResult, accessDate, accessTime, accessMessage
+                  accessLoginMessage = tcArg1
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.access_message", accessLoginMessage)
+
+               CASE tcLogType = 'forceUpdate' && SendLogToNewRelic(lcLog, lcLogType, lcLogResult, lcMessage, "", "", "", "", "", "", "")
+                  LOCAL accessResult, accessDate, accessTime, accessMessage
+                  accessLoginMessage = tcArg1
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.access_message", accessLoginMessage)
+
+               CASE tcLogType = 'inactiveSupport' && SendLogToNewRelic(lcLog, lcLogType, lcLogResult, lcMessage, "", "", "", "", "", "", "")
+                  LOCAL accessResult, accessDate, accessTime, accessMessage
+                  accessLoginMessage = tcArg1
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.access_message", accessLoginMessage)
+
+               CASE tcLogType = 'inactiveLicense' && SendLogToNewRelic(lcLog, lcLogType, lcLogResult, lcMessage, "", "", "", "", "", "", "")
+                  LOCAL accessResult, accessDate, accessTime, accessMessage
+                  accessLoginMessage = tcArg1
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.access_message", accessLoginMessage)
+
+               OTHERWISE
+                  MESSAGEBOX("Unrecognized access log type: " + tcLogType, 48, "Log Type Error")
+                  RETURN .F.
+            ENDCASE
+
+         CASE tcLog = "audit"
+            DO CASE
+               CASE tcLogType = 'comeLogType' && SendLogToNewRelic(lcLog, lcLogType, lnAuditData2, lnAuditData2, lnAuditData2, lcAuditDataMessage, "", "", "", "", "")
+                  LOCAL auditLeases, auditWells, auditOwners, auditMessage
+                  auditLeases  = tcArg1
+                  auditWells   = tcArg2
+                  auditOwners  = tcArg3
+                  auditMessage = tcArg4
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.audit_Leases", AuditData1)
+                  loJson.UpdateString("log.audit_Wells", AuditData2)
+                  loJson.UpdateString("log.audit_Owners", AuditData3)
+                  loJson.UpdateString("log.audit_message", auditDataMessage)
+
+               CASE tcLogType = 'auditClientInformation' && SendLogtoNewRelic(lcLog, lcLogType, lcMessage, "", "", "", "", "", "", "", "")
+                  auditMessage = tcArg1
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.audit_message", auditMessage)
+
+               OTHERWISE
+                  MESSAGEBOX("Unrecognized audit log type: " + tcLogType, 48, "Log Type Error")
+                  RETURN .F.
+            ENDCASE
+
+         CASE tcLog = "billing"
+            DO CASE
+               CASE tcLogType = '1099' && SendLogToNewRelic(lcLog, lcLogType, sentJson, responseJson, "", "", "", "", "", "", "")
+                  LOCAL  lcMessage1, lcMessage2
+                  sentJson     = tcArg1
+                  responseJson = tcArg2
+                  loJson.UpdateString("log.name", tcLog)
+                  loJson.UpdateString("log.type", tcLogType)
+                  loJson.UpdateString("log.billing_sentJson", sentJson)
+                  loJson.UpdateString("log.billing_responseJson", responseJson)
+               OTHERWISE
+                  MESSAGEBOX("Unrecognized billing log type: " + tcLogType, 48, "Log Type Error")
+                  RETURN .F.
+
+            ENDCASE
+
+         OTHERWISE
+            MESSAGEBOX("Unrecognized log name: " + tcLogType, 48, "Log Name Error")
+            RETURN .F.
+      ENDCASE
+
+* Convert the JSON object to a string for the request body.
+      lcJsonRequestBody = loJson.Emit()
+
+* MESSAGEBOX("Sending Request: " + CHR(13) + CHR(10) + lcJsonRequestBody, 0, "Request Details")
+
+
+* Convert the JSON object to a string for the request body.
+      lcJsonRequestBody = loJson.Emit()
+
+
+* Send the POST request.
+      loResp = loHttp.PostJson2(lcUrl, "application/json", lcJsonRequestBody)
+      IF (loHttp.LastMethodSuccess = 0) THEN
+* Commented out 6/17/24 by pws - Clients don't need to see Chilkat error messages
+*      MESSAGEBOX("Error sending request: " + loHttp.LastErrorText, 0, "Error")
+         RELEASE loHttp
+         RELEASE loJson
+         RETURN
+      ENDIF
+
+* Handle the response.
+      lcJsonResponseStr = loResp.BodyStr
+      LOCAL lcMessage AS STRING
+      lcMessage = "Response status code = " + STR(loResp.StatusCode) + CHR(13) + CHR(10) + "Response body: " + lcJsonResponseStr
+* MESSAGEBOX(lcMessage, 0, "Response Details")
+
+   CATCH TO loError
+
+   ENDTRY
+
+   RELEASE loResp
+   RELEASE loJson
+   RELEASE loHttp
+
+   RETURN llreturn
+
+ENDPROC
+
