@@ -1,0 +1,21 @@
+* Pivoten, LLC
+* Example of NewRelic log
+
+IF lnErrors < 1
+      INSERT INTO errorlog FROM MEMVAR
+      IF llSendErrorLog
+         lcLog     = "error"
+         lcLogType = "systemLog"
+         lcDate    = DTOC(dEDate)
+         lcTime    = cETime
+         lcProgram = tcCaller
+         lcMethod  = ALLTRIM(cMethod)
+         lcLine    = TRANSFORM(nLineNo)
+         lcNumber  = TRANSFORM(nENumber)
+         lcMessage = ALLTRIM(cMessage)
+         lcDetails = DETAILS
+         IF VERSION(2) # 2  && Don't send development logs
+            SendLogToNewRelic(lcLog, lcLogType, lcDate, lcTime, lcProgram, lcMethod, lcLine, lcNumber, lcMessage, lcDetails, "")
+         ENDIF
+      ENDIF
+   ENDIF
